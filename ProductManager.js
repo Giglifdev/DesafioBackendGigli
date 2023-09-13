@@ -1,32 +1,38 @@
+const fs = require("fs");
+
 class ProductManager {
   constructor() {
     this.products = [];
+    this.loadProductsFromFile();
   }
 
-  generateUniqueId() {
-    return Date.now().toString();
-  }
+  getProducts = () => {
+    return this.products;
+  };
+
+  getProductById = (id) => {
+    const productById = this.products.find((product) => product.id === id);
+
+    if (!productById) {
+      throw new Error("Product not found");
+    }
+
+    return productById;
+  };
 
   addProduct(title, description, price, thumbnail, code, stock) {
     if (!title || !description || !price || !thumbnail || !code || !stock) {
-      console.error("All fields are required.");
-      return;
+      throw new Error("All fields are required.");
     }
 
-    const existingProduct = this.products.find(
-      (product) => product.code === code
-    );
-    if (existingProduct) {
-      console.error(
-        "The code already exists. Duplicate products cannot be added."
-      );
-      return;
-    }
+    const codeExists = this.products.some((product) => product.code === code);
 
-    const id = this.generateUniqueId();
+    if (codeExists) {
+      throw new Error("Product with the same code already exists");
+    }
 
     const product = {
-      id,
+      id: this.generateUniqueId(),
       title,
       description,
       price,
@@ -36,49 +42,97 @@ class ProductManager {
     };
 
     this.products.push(product);
-
-    console.log("Product added successfully.");
+    this.saveProductsToFile();
   }
 
-  getProducts() {
-    return this.products;
-  }
+  updateProduct(id, updatedFields) {
+    const productToUpdate = this.getProductById(id);
 
-  getProductById(id) {
-    const product = this.products.find((product) => product.id === id);
-
-    if (!product) {
-      console.error("product not found.");
-      return null;
+    if (!productToUpdate) {
+      throw new Error("Product not found");
     }
 
-    return product;
+    delete updatedFields.id;
+
+    Object.assign(productToUpdate, updatedFields);
+    this.saveProductsToFile();
+  }
+
+  deleteProduct(id) {
+    const indexToDelete = this.products.findIndex(
+      (product) => product.id === id
+    );
+
+    if (indexToDelete === -1) {
+      throw new Error("Product not found");
+    }
+
+    this.products.splice(indexToDelete, 1);
+    this.saveProductsToFile();
+  }
+
+  generateUniqueId() {
+    if (this.products.length === 0) {
+      return 1;
+    } else {
+      const ids = this.products.map((product) => product.id);
+      return Math.max(...ids) + 1;
+    }
+  }
+
+  loadProductsFromFile() {
+    try {
+      const data = fs.readFileSync("products.json", "utf8");
+      this.products = JSON.parse(data);
+    } catch (error) {
+      this.products = [];
+      this.saveProductsToFile();
+    }
+  }
+
+  saveProductsToFile() {
+    const data = JSON.stringify(this.products, null, 2);
+    fs.writeFileSync("products.json", data);
   }
 }
 
-const productManager = new ProductManager();
-console.log(productManager.getProducts());
+const manager = new ProductManager();
 
-productManager.addProduct(
-  "test product",
-  "This is a test product",
-  200,
-  "no image",
-  "abc123",
-  25
-);
-console.log(productManager.getProducts());
+console.log(manager.getProducts());
 
-productManager.addProduct(
-  "another product",
-  "This is another product",
-  150,
-  "another image",
-  "abc123",
-  10
-);
+try {
+  manager.addProduct(
+    "product test",
+    "This is a test product",
+    200,
+    "no image",
+    "abc123",
+    25
+  );
+  console.log("Product successfully added");
+} catch (error) {
+  console.error(error.message);
+}
 
-const product = productManager.getProductById(1);
-console.log(product);
+console.log(manager.getProducts());
 
-productManager.getProductById(99);
+try {
+  const foundProduct = manager.getProductById(1);
+  console.log("Product found:", foundProduct);
+} catch (error) {
+  console.error(error.message);
+}
+
+try {
+  manager.updateProduct(1, { price: 250, stock: 30 });
+  console.log("Product updated");
+} catch (error) {
+  console.error(error.message);
+}
+
+try {
+  manager.deleteProduct(1);
+  console.log("Product deleted");
+} catch (error) {
+  console.error(error.message);
+}
