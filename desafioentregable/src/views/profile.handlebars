@@ -1,0 +1,11 @@
+<div>
+  <h1>Your Profile (no sensitive data)</h1>
+  <p>Name: {{user.first_name}} {{user.last_name}}</p>
+  <p>Email: {{user.email}}</p>
+  {{#if user.age}}
+    <p>Age: {{user.age}}</p>
+  {{/if}}
+  <p>Rol: {{user.role}}</p>
+  <a href="/api/sessions/logout"><button>Exit</button></a>
+  <a href="/products"><button>Products</button></a>
+</div>
