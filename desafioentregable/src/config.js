@@ -10,12 +10,14 @@ program.parse();
 // production = PROD
 const environment = program.opts().mode;
 
-config({
-  path: environment === "DEV" ? `./.env.development` : `./.env.production`,
-});
+config({ path: "../.env" });
 
 const configs = {
   port: process.env.PORT || 8090,
   mongoUrl: process.env.MONGO_URL,
+  githubClientId: process.env.GITHUB_CLIENT_ID,
+  githubClientSecret: process.env.GITHUB_CLIENT_SECRET,
+  githubCallbackUrl: process.env.GITHUB_CALLBACK_URL,
 };
+
 export default configs;

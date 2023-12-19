@@ -37,9 +37,9 @@ export const initializePassport = () => {
     passportStrategiesEnum.GITHUB,
     new GitHubStrategy(
       {
-        clientID: "Iv1.40d942bf70c1cd43",
-        clientSecret: "c29ac1ca0a57308d922bddf7a845bf96f41aade1",
-        callbackURL: "http://localhost:8080/api/sessions/github-callback",
+        clientID: process.env.GITHUB_CLIENT_ID,
+        clientSecret: process.env.GITHUB_CLIENT_SECRET,
+        callbackURL: process.env.GITHUB_CALLBACK_URL,
         scope: ["user:email"],
       },
       async (accessToken, refreshToken, profile, done) => {

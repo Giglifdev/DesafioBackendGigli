@@ -9,6 +9,9 @@ import cookieParser from "cookie-parser";
 import { __dirname } from "./utils.js";
 import configs from "./config.js";
 
+import { config } from "dotenv";
+config();
+
 // routes
 import SessionsRouter from "./routes/sessions.routes.js";
 import ProductsRouter from "./routes/products.routes.js";
@@ -26,7 +29,10 @@ const PORT = configs.port;
 // db
 
 try {
-  await mongoose.connect(configs.mongoUrl);
+  await mongoose.connect(configs.mongoUrl, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
   console.log("Database connected");
 } catch (error) {
   console.log(error.message);
@@ -47,7 +53,7 @@ app.use(cookieParser());
 app.use(
   session({
     store: MongoStore.create({
-      client: mongoose.connection.getClient(),
+      mongoUrl: configs.mongoUrl,
       ttl: 3600,
     }),
     secret: "Coder55575secret",
@@ -98,5 +104,5 @@ socketServer.on("connection", (socket) => {
     socket.broadcast.emit("newUserConnected", data);
   });
 });
-
+console.log("Configs:", configs);
 app.set("socketio", socketServer);
