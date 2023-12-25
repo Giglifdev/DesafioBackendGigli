@@ -1,6 +1,7 @@
 import { config } from "dotenv";
 import { Command } from "commander";
 import { __dirname } from "./utils.js";
+import { join } from "node:path";
 
 const program = new Command();
 program.option("--mode <mode>", "development environment variable", "DEV");
