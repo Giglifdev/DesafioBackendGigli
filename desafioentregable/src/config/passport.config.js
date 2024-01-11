@@ -4,9 +4,9 @@ import local from "passport-local";
 import { passportStrategiesEnum } from "./enums.js";
 import { PRIVATE_KEY_JWT } from "./constants.js";
 
-import usersModel from "../dao/dbManagers/models/users.model.js";
+import { usersModel } from "../dao/dbManagers/models/users.model.js";
 import jwt from "passport-jwt";
-import { createHash, isValidPassowrd } from "../utils.js";
+import { createHash, isValidPassword } from "../utils.js";
 
 // local auth
 const LocalStrategy = local.Strategy;
@@ -48,7 +48,6 @@ export const initializePassport = () => {
           const user = await usersModel.findOne({ email });
 
           if (!user) {
-            // Crear la cuenta o usuario desde 0
             const newUser = {
               first_name: profile._json.name,
               last_name: profile._json.name,
@@ -126,7 +125,7 @@ export const initializePassport = () => {
             return done(null, user);
           }
           const user = await usersModel.findOne({ email: username });
-          const validPassword = isValidPassowrd(password, user.password);
+          const validPassword = isValidPassword(password, user.password);
 
           if (!user || !validPassword) {
             return done(null, false);
@@ -139,7 +138,7 @@ export const initializePassport = () => {
     )
   );
 
-  // Serialization and deserialization
+  // serialize and deserealize
   passport.serializeUser((user, done) => {
     done(null, user._id);
   });

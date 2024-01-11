@@ -1,99 +1,104 @@
-import { getCart as getCartServices } from "../services/carts.services.js";
-import { createCart as createCartServices } from "../services/carts.services.js";
-import { addProduct as addProductServices } from "../services/carts.services.js";
-import { updateCart as updateCartServices } from "../services/carts.services.js";
-import { deleteProduct as deleteProductServices } from "../services/carts.services.js";
-import { deleteCart as deleteCartProductsServices } from "../services/carts.services.js";
+import {
+  addCart as addCartService,
+  getCartById as getCartByIdService,
+  addProduct as addProductService,
+  deleteProduct as deleteProductService,
+  deleteAllProducts as deleteAllProductsService,
+  updateAllProducts as updateAllProductsService,
+  updateQuantity as updateQuantityService,
+} from "../services/carts.services.js";
 
-export const getCart = async (req, res) => {
+const addCart = async (req, res) => {
+  try {
+    const newCart = await addCartService({});
+    res.status(201).send({ status: "success", payload: newCart });
+  } catch (error) {
+    res.status(500).send({ status: "error", payload: error.message });
+  }
+};
+
+const getCartById = async (req, res) => {
   try {
     const cid = req.params.cid;
-    const cart = await getCartServices(cid);
-    if (!cart) return res.sendNotFoundError("Cart not found");
-    return res.sendSuccess(cart);
+    const cart = await getCartByIdService(cid);
+    res.status(200).send({ status: "success", payload: cart.products });
   } catch (error) {
-    return res.sendServerError(error.message);
+    res.status(500).send({ status: "error", payload: error.message });
   }
 };
-export const createCart = async (req, res) => {
+
+const addProduct = async (req, res) => {
   try {
-    const cart = await createCartServices();
-    return res.sendSuccess(cart);
+    const idCart = req.params.cid;
+    const idProd = req.params.pid;
+
+    const result = addProductService(idCart, idProd);
+    res.status(200).send({ status: "success", payload: result });
   } catch (error) {
-    return res.sendServerError(error.message);
+    res.status(400).send({ error: error.message });
   }
 };
-export const addProduct = async (req, res) => {
-  try {
-    const { cid, pid } = req.params;
-    const result = await addProductServices(cid, pid);
-    if (result.error) return res.sendNotFoundError(result.error);
 
-    return res.sendSuccess(result);
+const deleteProduct = async (req, res) => {
+  try {
+    const idCart = req.params.cid;
+    const idProd = req.params.pid;
+
+    const result = await deleteProductService(idCart, idProd);
+
+    res.status(200).send({ status: "success", payload: result });
   } catch (error) {
-    return res.sendServerError(error.message);
+    res.status(400).send({ error: error.message });
   }
 };
-export const updateCart = async (req, res) => {
-  try {
-    const { cid } = req.params;
-    const { products } = req.body;
 
-    const updatedCart = await updateCartServices(cid, products);
-    if (updatedCart.error) return res.sendNotFoundError(updatedCart.error);
-    return res.sendSuccess(updatedCart);
+const deleteAllProducts = async (req, res) => {
+  try {
+    const idCart = req.params.cid;
+    const deletedProducts = await deleteAllProductsService(idCart);
+
+    res.status(200).send({ status: "success", payload: deletedProducts });
   } catch (error) {
-    return res.sendServerError(error.message);
+    res.status(400).send({ error: error.message });
   }
 };
-// Update cart
-export const updateProducts = async (req, res) => {
+
+const updateAllProducts = async (req, res) => {
   try {
-    const { quantity } = req.body;
-    const { cid, pid } = req.params;
-    const product = await this.productManager.getById(pid);
-    if (!product) return res.sendNotFoundError("Product not found");
+    const idCart = req.params.cid;
+    const newProducts = req.body.products;
+    const updatedCart = await updateAllProductsService(idCart, newProducts);
 
-    const cart = await this.cartsManager.getById(cid);
-    if (!cart) return res.sendNotFoundError("Cart not found");
+    res.status(200).send({ status: "success", payload: updatedCart });
+  } catch (error) {
+    res.status(400).send({ status: "error", payload: error.message });
+  }
+};
 
-    if (!quantity) return res.sendUnproccesableEntity("Quantity is required");
+const updateQuantity = async (req, res) => {
+  try {
+    const idCart = req.params.cid;
+    const idProduct = req.params.pid;
+    const newQuantity = req.body.quantity;
 
-    const updatedQuantityCart = await this.cartsManager.updateQuantityProduct(
-      cid,
-      pid,
-      quantity
+    const updatedCart = await updateQuantityService(
+      idCart,
+      idProduct,
+      newQuantity
     );
-    return res.sendSucess(updatedQuantityCart);
+
+    res.status(200).send({ status: "success", payload: updatedCart });
   } catch (error) {
-    return res.sendServerError(error.message);
+    res.status(400).send({ error: error.message });
   }
 };
-// Delete all products in cart
-export const deleteCart = async (req, res) => {
-  try {
-    const { cid } = req.params;
-    const result = await deleteCartProductsServices(cid);
-    if (result.error) return res.sendNotFoundError(result.error);
-    return res.sendSuccess(result);
-  } catch (error) {
-    if (error.message.toLowerCase().includes("not found"))
-      return res.sendNotFoundError(error.message);
-    return res.sendServerError(error.message);
-  }
-};
-// Delete one product in cart
-export const deleteProduct = async (req, res) => {
-  try {
-    const { pid, cid } = req.params;
-    const result = await deleteProductServices(cid, pid);
-    if (result.error) {
-      if (result.statusCode === 404) return res.sendNotFoundError(result.error);
-    }
-    return res.sendSuccess(result);
-  } catch (error) {
-    if (error.message.toLowerCase().includes("not found"))
-      return res.sendNotFoundError(error.message);
-    return res.sendServerError(error.message);
-  }
+
+export {
+  addCart,
+  getCartById,
+  addProduct,
+  deleteProduct,
+  deleteAllProducts,
+  updateAllProducts,
+  updateQuantity,
 };

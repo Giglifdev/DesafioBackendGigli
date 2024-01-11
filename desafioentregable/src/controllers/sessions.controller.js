@@ -1,78 +1,56 @@
-import { generateToken } from "../utils.js";
-import { validateUser } from "../schemas/users.schema.js";
-import { login as loginServices } from "../services/sessions.services.js";
-import { logout as logoutServices } from "../services/sessions.services.js";
-import { register as registerServices } from "../services/sessions.services.js";
+import {
+  Register as RegisterService,
+  Login as LoginService,
+} from "../services/sessions.services.js";
 
-export const login = async (req, res) => {
+const Login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) return res.sendClientError("incomplete values");
-
-    if (email === "adminCoder@coder.com" && password === "adminCod3r123") {
-      const userAdminCoder = {
-        _id: 1,
-        first_name: "Admin",
-        last_name: "Coder",
-        email,
-        role: "admin",
-      };
-      const accessToken = generateToken(userAdminCoder);
-
-      res.cookie("coderCookieToken", accessToken, {
-        maxAge: 24 * 60 * 60 * 1000,
+    const accessToken = await LoginService(email, password);
+    res
+      .cookie("coderCookieToken", accessToken, {
+        maxAge: 60 * 60 * 1000,
         httpOnly: true,
-      });
-      return res.sendSuccess(accessToken);
-    }
-    const user = await loginServices(email, password);
-
-    if (user.error) return res.sendAuthError(user.error);
-    const accessToken = generateToken(user);
-
-    res.cookie("coderCookieToken", accessToken, {
-      maxAge: 24 * 60 * 60 * 1000,
-      httpOnly: true,
-    });
-    return res.sendSuccess(accessToken);
+      })
+      .send({ status: "success", message: "login success" });
   } catch (error) {
-    console.log(error.message);
-    return res.sendServerError(error.message);
+    res.status(500).send({ error: error.message });
   }
 };
 
-export const register = async (req, res) => {
-  try {
-    const resultUser = validateUser(req.body);
-    if (resultUser.error) return res.sendUnproccesableEntity(resultUser.error);
-    const user = resultUser.data;
-    const registeredUser = await registerServices(user);
-    if (registeredUser.error) return res.sendClientError(registeredUser.error);
+const Logout = (req, res) => {
+  req.session.destroy((error) => {
+    if (error)
+      return res.status(500).send({ status: "error", message: error.message });
+    res.redirect("/login");
+  });
+};
 
-    return res.sendSuccessNewResource({ payload: registeredUser });
+const Register = async (req, res) => {
+  try {
+    const { first_name, last_name, age, role, email, password } = req.body;
+    const userToSave = await RegisterService(
+      first_name,
+      last_name,
+      age,
+      role,
+      email,
+      password
+    );
+
+    res.status(201).send({ status: "success", payload: userToSave });
   } catch (error) {
-    return res.sendServerError(error.message);
+    res.status(500).send({ error: error.message });
   }
 };
 
-export const logout = async (req, res) => {
-  try {
-    const result = await logoutServices(req.user.email);
-    return res.clearCookie("coderCookieToken").redirect("/login");
-  } catch (error) {}
+const Github = async (req, res) => {
+  res.send({ status: "success", message: "user registered" });
 };
 
-export const github = async (req, res) => {
-  return res.send({ status: "success", message: "user registered" });
+const Github_callback = async (req, res) => {
+  req.session.user = req.user;
+  res.redirect("/");
 };
 
-export const githubCallback = async (req, res) => {
-  req.user = {
-    first_name: req.user.first_name,
-    last_name: req.user.last_name,
-    email: req.user.email,
-    age: req.user.age,
-    role: req.user.role,
-  };
-  return res.redirect("/products");
-};
+export { Login, Logout, Register, Github, Github_callback };

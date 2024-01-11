@@ -1,40 +1,29 @@
-const loginForm = document.getElementById("loginForm");
+const form = document.getElementById("loginForm");
 
-loginForm.addEventListener("submit", (e) => {
+form.addEventListener("submit", (e) => {
   e.preventDefault();
-  const data = new FormData(loginForm);
+  const data = new FormData(form);
   const obj = {};
-  data.forEach((value, key) => {
-    obj[key] = value;
-  });
 
-  const cartId = fetch(`/api/carts`, {
-    method: "POST",
-    body: "",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  })
-    .then((result) => result.json())
-    .then((cart) => (obj.cart = cart["_id"]));
-
-  console.log(cartId);
-
+  data.forEach((value, key) => (obj[key] = value));
   fetch("/api/sessions/login", {
     method: "POST",
     body: JSON.stringify(obj),
     headers: {
       "Content-Type": "application/json",
     },
-  }).then((result) => {
-    if (result.status === 200) {
-      window.location.replace("/products");
-    }
-    if (result.status === 401 || result.status === 400) {
-      alert("Incorrect Credentials");
-    }
-    if (result.status === 500) {
-      alert("Incorrect Credentials");
-    }
-  });
+  })
+    .then((result) => {
+      if (result.status === 200) {
+        console.log("Login successful");
+        window.location.replace("/");
+      } else if (result.status === 401) {
+        console.log("Invalid credentials");
+      } else {
+        console.log("Server error:", result.status);
+      }
+    })
+    .catch((error) => {
+      console.error("Error fetch:", error);
+    });
 });

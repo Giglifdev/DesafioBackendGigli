@@ -5,7 +5,7 @@ export default class ProductManager {
     this.path = path;
   }
 
-  // get all
+  // GET ALL
   getAll = async () => {
     try {
       if (fs.existsSync(this.path)) {
@@ -23,7 +23,7 @@ export default class ProductManager {
     }
   };
 
-  // get id
+  // GET BY ID
   getById = async (id) => {
     try {
       const products = await this.getProducts();
@@ -43,7 +43,7 @@ export default class ProductManager {
     }
   };
 
-  // add
+  // ADD
   create = async ({
     title,
     description,
@@ -62,7 +62,7 @@ export default class ProductManager {
       stock,
       status,
     };
-
+    // validate fields
     if (!title || !description || !price || !code || !stock) {
       return {
         status: "error",
@@ -78,7 +78,7 @@ export default class ProductManager {
       } else {
         producto.id = products[products.length - 1].id + 1;
       }
-      // code
+      // CODE
       const productCode = products.find((product) => product.code === code);
       if (productCode) {
         return {
@@ -100,7 +100,7 @@ export default class ProductManager {
     }
   };
 
-  // update
+  // UPDATE
   update = async (
     id,
     { title, description, price, thumbnail = [], code, stock, status = true }
@@ -114,6 +114,7 @@ export default class ProductManager {
       stock,
       status,
     };
+    // validate fields
 
     if (!id) {
       return { status: "error", error: "Id is not defined" };
@@ -161,7 +162,7 @@ export default class ProductManager {
     }
   };
 
-  // delete
+  // DELETE
   delete = async (id) => {
     if (!id) {
       return { status: "error", error: "Id is not defined" };

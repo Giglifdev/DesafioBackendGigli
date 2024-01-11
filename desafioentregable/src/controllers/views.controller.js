@@ -1,153 +1,128 @@
+import { productsModel } from "../dao/dbManagers/models/products.model.js";
 import Products from "../dao/dbManagers/products.manager.js";
 import Carts from "../dao/dbManagers/carts.manager.js";
-import Messages from "../dao/dbManagers/messages.manager.js";
 
-const productsManager = new Products();
-const cartsManager = new Carts();
-const messagesManager = new Messages();
+const products = new Products();
+const carts = new Carts();
 
-export const realTimeProductsView = async (req, res) => {
-  try {
-    const { limit = 10, page = 1, sort, query = {} } = req.query;
-    const options = {
-      limit,
-      page,
-      query,
-    };
-    if (sort?.toLowerCase() === "asc") {
-      options.sort = { price: 1 };
-    } else if (sort?.toLowerCase() === "desc") {
-      options.sort = { price: -1 };
-    }
-    const {
-      docs: productsList,
-      hasPrevPage,
-      hasNextPage,
-      nextPage,
-      prevPage,
-    } = await productsManager.getAll(options);
-    res.render("realtimeproducts", {
-      products: productsList,
-      user: req.user,
-      hasPrevPage,
-      hasNextPage,
-      nextPage,
-      prevPage,
-    });
-  } catch (error) {
-    return res.status(500).send(`<h2>Error 500: ${error.message}</h2>`);
-  }
+const Register = async (req, res) => {
+  res.render("register");
 };
 
-export const productsView = async (req, res) => {
+const Login = async (req, res) => {
+  res.render("login");
+};
+
+const renderProducts = async (req, res) => {
+  let { page = 1, limit = 10 } = req.query;
+  page = parseInt(page, 10);
+  limit = parseInt(limit, 10);
+
   try {
-    const { limit = 10, page = 1, sort, query: queryP, queryValue } = req.query;
     const options = {
-      limit,
-      page,
-      query: {},
+      page: page,
+      limit: limit,
+      lean: true,
+      leanWithId: false,
     };
 
-    let sortLink = "";
-    if (sort?.toLowerCase() === "asc") {
-      options.sort = { price: 1 };
-      sortLink = `&sort=${sort}`;
-    } else if (sort?.toLowerCase() === "desc") {
-      options.sort = { price: -1 };
-      sortLink = `&sort=${sort}`;
-    }
-    let queryLink = "";
-    if (queryP && queryValue) {
-      options.query[queryP] = queryValue;
-      queryLink = `&query=${queryP}&queryValue=${queryValue}`;
-    }
+    const result = await productsModel.paginate({}, options);
 
-    const {
-      docs: productsList,
-      hasPrevPage,
-      hasNextPage,
-      nextPage,
-      prevPage,
-      totalPages,
-    } = await productsManager.getAll(options);
-    const prevLink = hasPrevPage
-      ? `/products?limit=${limit}&page=${prevPage}${sortLink}${queryLink}`
-      : null;
-    const nextLink = hasNextPage
-      ? `/products?limit=${limit}&page=${nextPage}${sortLink}${queryLink}`
-      : null;
+    console.log("User Data:", req.session.user);
+
     res.render("products", {
-      user: req.user,
-      products: productsList,
-      totalPages,
-      prevPage,
-      nextPage,
-      page,
-      hasPrevPage,
-      hasNextPage,
-      prevLink,
-      nextLink,
-      style: "products.css",
+      user: req.session.user,
+      products: result.docs,
+      page: result.page,
+      totalPages: result.totalPages,
+      hasNextPage: result.hasNextPage,
+      hasPrevPage: result.hasPrevPage,
+      prevPage: result.prevPage,
+      nextPage: result.nextPage,
+      limit: result.limit,
     });
   } catch (error) {
-    return res.status(500).send(`<h2>Error 500: ${error.message} </h2>`);
+    res.status(500).render("error", { message: "Error loading product list." });
   }
 };
 
-export const productDetail = async (req, res) => {
+const renderDetails = async (req, res) => {
   try {
-    const { pid } = req.params;
-    const product = await productsManager.getById(pid);
-    if (!product)
-      return res
-        .status(404)
-        .render(`<h2>Error 404: Product with id ${pid} not found </h2>`);
-    return res.render("product", {
-      product,
-      user: req.user,
-      style: "product.css",
-    });
+    const productId = req.params.productId;
+    const product = await products.getProductById(productId);
+    if (!product) {
+      return res.status(404).render("error", { message: "Product not found." });
+    }
+
+    const productObject = product.toObject();
+
+    res.render("productDetails", { product: productObject });
   } catch (error) {
-    return res.status(500).send(`<h2>Error 500: ${error.message} </h2>`);
+    res.status(500).render("error", {
+      message: "Error retrieving product details.",
+    });
   }
 };
 
-export const cartDetail = async (req, res) => {
+const renderCart = async (req, res) => {
+  const cartId = req.params.cid;
+
   try {
-    const cid = req.params.cid;
-    const cart = await cartsManager.getById(cid);
-    if (!cart)
-      return res
-        .status(400)
-        .render(`<h2>Error 404: Cart with id ${cid} not found </h2>`);
-    const products = cart.products;
-    return res.render("cart", {
-      products,
-      user: req.user,
-      style: "cart.css",
+    const cart = await carts.getById(cartId).populate("products.product");
+
+    if (!cart) {
+      return res.status(404).render("error", { message: "Cart not found." });
+    }
+
+    const productsWithSubtotals = cart.products.map((item) => {
+      return {
+        ...item.toObject(),
+        subtotal: item.quantity * item.product.price,
+      };
     });
+
+    res.render("carts", { products: productsWithSubtotals });
   } catch (error) {
-    return res.status(500).send(`<h2>Error 500: ${error.message}</h2>`);
+    res.status(500).render("error", { message: "Error loading cart." });
   }
 };
 
-export const chat = async (req, res) => {
-  const messagesList = await messagesManager.getAll();
-  return res.render("chat", { messages: messagesList, style: "chat.css" });
+const addToCart = async (req, res) => {
+  try {
+    const { cartId, productId } = req.params;
+    const { quantity } = req.body;
+
+    const cart = await carts.getById(cartId);
+
+    if (!cart) {
+      return res.status(404).send("Cart not found");
+    }
+
+    const product = await products.getProductById(productId);
+
+    const productIndex = cart.products.findIndex(
+      (p) => p.product.toString() === productId
+    );
+
+    if (productIndex === -1) {
+      await carts.updateCart(cartId, product);
+    } else {
+      await carts.updateProductQuantity(cartId, productId, quantity);
+    }
+
+    res
+      .status(200)
+      .send({ message: "Product added to cart", cartId: cart._id });
+  } catch (error) {
+    res.status(500).send("Error when adding product to cart.");
+  }
 };
 
-export const login = async (req, res) => {
-  if (req?.user) return res.redirect("/products");
-  return res.render("login", { style: "login.css" });
-};
-
-export const register = (req, res) => {
-  res.render("register", { style: "register.css" });
-};
-
-export const profile = (req, res) => {
-  res.render("profile", {
-    user: req.user,
-    style: "profile.css",
-  });
+export {
+  renderDetails,
+  renderProducts,
+  renderCart,
+  addToCart,
+  Register,
+  Login,
 };

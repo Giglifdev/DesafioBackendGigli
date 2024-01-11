@@ -1,127 +1,139 @@
-import { validateProduct } from "../schemas/products.schema.js";
-import { getProducts as getProductsServices } from "../services/products.services.js";
-import { getProduct as getProductServices } from "../services/products.services.js";
-import { createProduct as createProductServices } from "../services/products.services.js";
-import { updateProduct as updateProductServices } from "../services/products.services.js";
-import { deleteProduct as deleteProductServices } from "../services/products.services.js";
+import {
+  getProducts as getProductsService,
+  getProductById as getProductByIdService,
+  addProduct as addProductService,
+  updateProduct as updateProductService,
+  deleteProduct as deleteProductService,
+} from "../services/products.services.js";
+import { generateProduct } from "../utils.js";
 
-export const getProducts = async (req, res) => {
+const getProducts = async (req, res) => {
   try {
-    const { limit = 10, page = 1, sort, query: queryP, queryValue } = req.query;
-    const options = {
-      limit,
-      page,
-      query: {},
-    };
+    let { limit = 10, page = 1, sort, query } = req.query;
+    limit = parseInt(limit);
+    page = parseInt(page);
+
+    const result = await getProductsService(page, limit, sort, query);
+
+    res.send({
+      status: "success",
+      payload: {
+        docs: result.docs,
+        totalPages: result.totalPages,
+        prevPage: result.hasPrevPage ? result.prevPage : null,
+        nextPage: result.hasNextPage ? result.nextPage : null,
+        page: result.page,
+        hasPrevPage: result.hasPrevPage,
+        hasNextPage: result.hasNextPage,
+        prevLink: result.hasPrevPage
+          ? `/products?limit=${limit}&page=${result.prevPage}&sort=${sort}&query=${query}`
+          : null,
+        nextLink: result.hasNextPage
+          ? `/products?limit=${limit}&page=${result.nextPage}&sort=${sort}&query=${query}`
+          : null,
+      },
+    });
+  } catch (error) {
+    res.send({ status: "error", payload: { message: error.message } });
+  }
+};
+
+const getProductById = async (req, res) => {
+  try {
+    const id = req.params.pid;
+    const product = await getProductByIdService(id);
+    res.send({ status: "success", payload: product });
+  } catch (error) {
+    res.status(500).send({ status: "error", error: error.message });
+  }
+};
+
+const addProduct = async (req, res) => {
+  try {
+    const product = req.body;
+    const result = await addProductService(product);
+    res.send({ status: "success", payload: result });
+  } catch (error) {
+    res.status(400).send({ error: error.message });
+  }
+};
+
+const updateProduct = async (req, res) => {
+  try {
     const {
-      products,
-      hasPrevPage,
-      hasNextPage,
-      nextPage,
-      prevPage,
-      totalPages,
-      sortLink,
-    } = await getProductsServices(options, sort, queryP, queryValue);
-    if (!products)
-      return res.status(200).send({ status: "success", payload: [] });
+      title,
+      description,
+      price,
+      thumbnail,
+      code,
+      stock,
+      status,
+      category,
+    } = req.body;
+    const id = req.params.pid;
 
-    const prevLink = hasPrevPage
-      ? `/api/products?limit=${limit}&page=${prevPage}${sortLink}`
-      : null;
-    const nextLink = hasNextPage
-      ? `/api/products?limit=${limit}&page=${nextPage}${sortLink}`
-      : null;
+    if (
+      !title ||
+      !description ||
+      !price ||
+      !code ||
+      !stock ||
+      !status ||
+      !category
+    ) {
+      return res
+        .status(400)
+        .send({ status: "error", message: "incomplete values" });
+    }
 
-    return res.sendSuccess(
-      products,
-      totalPages,
-      prevPage,
-      nextPage,
-      page,
-      hasPrevPage,
-      hasNextPage,
-      prevLink,
-      nextLink
-    );
-  } catch (error) {
-    return res.sendServerError(error.message);
-  }
-};
-
-export const getProduct = async (req, res) => {
-  try {
-    const { pid } = req.params;
-    const product = await getProductServices(pid);
-    if (!product) return res.sendNotFoundError("Product not found");
-
-    return res.sendSuccess(product);
-  } catch (error) {
-    return res.sendServerError(error.message);
-  }
-};
-
-export const createProduct = async (req, res) => {
-  try {
-    const options = {
-      limit: 10,
-      page: 1,
-      query: {},
-    };
-    const result = validateProduct(req.body);
-    const io = req.app.get("socketio");
-    if (result.error) return res.sendClientError(result.error);
-    const newProduct = await createProductServices(result.data);
-    const { products: productsEmit } = await getProductsServices(options);
-    io.emit("refreshProducts", productsEmit);
-    return res.sendSuccess(newProduct);
-  } catch (error) {
-    return res.sendServerError(error.message);
-  }
-};
-
-export const updateProduct = async (req, res) => {
-  try {
-    const { pid } = req.params;
-    const options = {
-      limit: 10,
-      page: 1,
-      query: {},
-    };
-    const io = req.app.get("socketio");
-    const result = validateProduct(req.body);
-    if (result.error) return res.sendClientError(result.error);
-
-    const productUpdated = await updateProductServices(pid, result.data);
-    if (productUpdated.error)
-      return res.sendNotFoundError(productUpdated.error);
-
-    const { products: productsEmit } = await getProductsServices(options);
-    io.emit("refreshProducts", productsEmit);
-
-    return res.sendSuccess(productUpdated);
-  } catch (error) {
-    return res.sendServerError(error.message);
-  }
-};
-export const deleteProduct = async (req, res) => {
-  try {
-    const { pid } = req.params;
-    const options = {
-      limit: 10,
-      page: 1,
-      query: {},
+    const product = {
+      title,
+      description,
+      price,
+      thumbnail,
+      code,
+      stock,
+      status,
+      category,
     };
 
-    const io = req.app.get("socketio");
+    const result = await updateProductService(id, product);
 
-    const deletedProduct = await deleteProductServices(pid);
-    if (deletedProduct.error)
-      return res.sendNotFoundError(deletedProduct.error);
-
-    const { products: productsEmit } = await getProductsServices(options);
-    io.emit("refreshProducts", productsEmit);
-    return res.sendSuccess("Product deleted succesfully");
+    res.send({ status: "success", payload: result });
   } catch (error) {
-    return res.sendServerError(error.message);
+    res.status(400).send({ error: error.message });
   }
+};
+
+const deleteProduct = async (req, res) => {
+  try {
+    const id = req.params.pid;
+    const result = await deleteProductService(id);
+    res.send({ status: "success", payload: result });
+  } catch (error) {
+    res.status(400).send({ error: error.message });
+  }
+};
+
+const mockingProducts = async (req, res) => {
+  try {
+    let products = [];
+
+    for (let i = 0; i < 100; i++) {
+      products.push(generateProduct());
+    }
+
+    res.send({ status: "success", counter: products.length, data: products });
+  } catch (error) {
+    res.status(400).send({ error: error.message });
+  }
+};
+
+export {
+  getProducts,
+  getProductById,
+  addProduct,
+  updateProduct,
+  deleteProduct,
+  mockingProducts,
 };

@@ -1,28 +1,28 @@
-const registerForm = document.getElementById("registerForm");
+const form = document.getElementById("registerForm");
 
-registerForm.addEventListener("submit", (e) => {
+form.addEventListener("submit", (e) => {
   e.preventDefault();
-  const data = new FormData(registerForm);
+  const data = new FormData(form);
   const obj = {};
-  data.forEach((value, key) => {
-    obj[key] = value;
-  });
+
+  data.forEach((value, key) => (obj[key] = value));
+  console.log("Before the fetch call");
   fetch("/api/sessions/register", {
     method: "POST",
     body: JSON.stringify(obj),
     headers: {
       "Content-Type": "application/json",
     },
-  }).then((result) => {
-    console.log(result);
-    if (result.status === 201) {
-      window.location.replace("/login");
-    }
-    if (result.status === 400) {
-      alert("User is already registered");
-    }
-    if (result.status === 422) {
-      alert("Error in fields");
-    }
-  });
+  })
+    .then((result) => {
+      if (result.status === 201) {
+        console.log("Redirecting to /login");
+        window.location.replace("/login");
+      } else {
+        console.log("Error Server:", result.status);
+      }
+    })
+    .catch((error) => {
+      console.error("Error  fetch:", error);
+    });
 });

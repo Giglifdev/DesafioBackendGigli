@@ -1,26 +1,23 @@
-import z from "zod";
+import Joi from "joi";
 
-const cartSchema = z.object({
-  products: z
-    .array(
-      z.object({
-        product: z
-          .string({
-            invalid_type_error: "product must be a string",
-            required_error: "product is required",
-          })
-          .uuid({ message: "product must be a UUID format" }),
-        quantity: z
-          .number({
-            invalid_type_error: "quantity must be a number",
-          })
-          .min(1)
-          .default(1),
-      })
-    )
-    .default([]),
+export const updateProductInCartSchema = Joi.object({
+  quantity: Joi.number().required(),
 });
 
-export function validateCart(cart) {
-  return cartSchema.safeParse(cart);
-}
+export const updateFullCartSchema = Joi.object({
+  products: Joi.array().items(
+    Joi.object({
+      product: Joi.string().pattern(new RegExp("^[a-zA-Z0-9]{24}$")).required(),
+      quantity: Joi.number().required(),
+    })
+  ),
+});
+
+export const getCartByIdSchema = Joi.object({
+  cid: Joi.string().pattern(new RegExp("^[a-zA-Z0-9]{24}$")).required(),
+});
+
+export const productCartSchema = Joi.object({
+  cid: Joi.string().pattern(new RegExp("^[a-zA-Z0-9]{24}$")).required(),
+  pid: Joi.string().pattern(new RegExp("^[a-zA-Z0-9]{24}$")).required(),
+});

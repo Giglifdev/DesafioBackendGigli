@@ -1,79 +1,46 @@
-import Products from "../dao/dbManagers/products.manager.js";
-import { productsFilePath } from "../utils.js";
+import ProductsRepository from "../repositories/products.repository.js";
+import Products from "../dao/memoryManager/products.manager.js";
 
-const productsManager = new Products();
+const productsDao = new Products();
+const productsRepository = new ProductsRepository(productsDao);
 
-export const getProducts = async (options, sort, queryP, queryValue) => {
-  const { limit, page } = options;
-  let sortLink = "";
-  if (sort?.toLowerCase() === "asc") {
-    options.sort = { price: 1 };
-    sortLink = `&sort=${sort}`;
-  } else if (sort?.toLowerCase() === "desc") {
-    options.sort = { price: -1 };
-    sortLink = `&sort=${sort}`;
-  }
-  if (queryP && queryValue) {
-    options.query[queryP] = queryValue;
-  }
-  //
-  const key = Object.keys(options.query)[0];
-  const value = Object.values(options.query)[0];
-  if (key?.toLowerCase() === "stock") {
-    options.query = {
-      [key?.toLowerCase()]: { $gte: value },
-    };
-  } else if (key?.toLowerCase() === "category") {
-    options.query = {
-      [key?.toLowerCase()]: { $regex: value, $options: "i" },
-    };
-  } else {
-    options.query = {};
-  }
-
-  const {
-    docs: products,
-    hasPrevPage,
-    hasNextPage,
-    nextPage,
-    prevPage,
-    totalPages,
-  } = await productsManager.getAll(options);
-  return {
-    products,
-    hasPrevPage,
-    hasNextPage,
-    nextPage,
-    prevPage,
-    totalPages,
-    limit,
-    page,
-    sortLink,
+const getProducts = async (page, limit, sort, query) => {
+  const options = {
+    page: page,
+    limit: limit,
+    sort: sort ? { price: sort === "asc" ? 1 : -1 } : {},
   };
-};
 
-export const getProduct = async (pid) => {
-  const product = productsManager.getById(pid);
-  return product;
-};
+  const filter = query ? { category: query, status: true } : { status: true };
+  const result = await productsRepository.filterProducts(filter, options);
 
-export const createProduct = async (product) => {
-  const result = productsManager.create(product);
   return result;
 };
 
-export const updateProduct = async (pid, product) => {
-  const productExists = await productsManager.getById(pid);
-  if (!productExists)
-    return { status: "error", error: "Product not found, incorrect id" };
-  const updatedProduct = await productsManager.update(pid, product);
-  return updatedProduct;
+const getProductById = async (id) => {
+  const product = await productsRepository.getProductById(id);
+  return product;
 };
 
-export const deleteProduct = async (pid) => {
-  const productExists = await productsManager.getById(pid);
-  if (!productExists)
-    return { status: "error", error: "Product not found, incorrect id" };
-  const deletedProduct = await productsManager.delete(pid);
-  return deletedProduct;
+const addProduct = async (product) => {
+  const result = await productsRepository.addProduct(product);
+  return result;
+};
+
+const updateProduct = async (id, product) => {
+  const result = await productsRepository.updateProduct(id, product);
+  return result;
+};
+
+const deleteProduct = async (id) => {
+  const result = await productsRepository.deleteProduct(id);
+  return result;
+};
+
+export {
+  getProducts,
+  getProductById,
+  addProduct,
+  updateProduct,
+  deleteProduct,
 };
