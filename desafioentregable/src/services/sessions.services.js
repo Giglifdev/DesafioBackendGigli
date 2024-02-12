@@ -1,40 +1,82 @@
-import { CartsModel } from "../dao/dbManagers/models/carts.model.js";
-import { createHash, isValidPassword, generateToken } from "../utils.js";
-import Users from "../dao/dbManagers/users.manager.js";
-import UserRepository from "../repositories/user.reposity.js";
-import { usersModel } from "../dao/dbManagers/models/users.model.js";
+import { Users as UsersDao } from "../dao/factory.js";
+import UsersRepository from "../repositories/users.repository.js";
+import { createHash, isValidPassowrd } from "../utils.js";
+import { sendEmail } from "./mail.services.js";
+import { resetPasswordEmail } from "../utils/custom.html.js";
+import {
+  PasswordIsNotValidError,
+  UserNotFoundError,
+} from "../utils/custom.exceptions.js";
 
-const userDao = new Users();
-const userRepository = new UserRepository(userDao);
+const usersDao = new UsersDao();
+const userRepository = new UsersRepository(usersDao);
 
-const Register = async (first_name, last_name, age, role, email, password) => {
-  const user = await userRepository.getUserByEmail(email);
-  console.log(user);
-
-  if (!user) {
-    const cart = await CartsModel.create({ products: [] });
-    const userToSave = new usersModel({
-      first_name,
-      last_name,
-      email,
-      age,
-      password: createHash(password),
-      role,
-      cart: cart._id,
-    });
-
-    await userToSave.save();
-    return userToSave;
-  }
+export const login = async (email) => {
+  const user = await userRepository.login(email);
+  return user;
 };
 
-const Login = async (email, password) => {
-  const user = await userRepository.getUserByEmail(email);
-  if (user || isValidPassword(password, user.password)) {
-    const { password: _, ...userResult } = user;
-    const accessToken = generateToken(userResult);
-    return accessToken;
-  }
+export const showPublicUser = async (user) => {
+  const publicUser = await userRepository.showPublicUser(user);
+  return publicUser;
 };
 
-export { Register, Login };
+export const addCartToUser = async (user, cartId) => {
+  const newUser = await userRepository.addCartToUser(user, cartId);
+  return newUser;
+};
+
+export const register = async (user) => {
+  const hashedPassword = createHash(user.password);
+  const newUser = { ...user };
+  newUser.password = hashedPassword;
+  const result = await userRepository.register(newUser);
+  return result;
+};
+
+export const logout = async (email) => {
+  const result = await userRepository.logout(email);
+  return result;
+};
+
+export const passwordLink = async (user, token) => {
+  const html = resetPasswordEmail(
+    `${user.first_name} ${user.last_name}`,
+    token
+  );
+  const email = {
+    to: user.email,
+    subject: "Password Reset Link",
+    html,
+  };
+  const sentMail = await sendEmail(email);
+  return sentMail;
+};
+
+export const updatePassword = async (email, user, newPassword) => {
+  const { password } = user;
+  const isValid = isValidPassowrd(newPassword, password);
+
+  if (!isValid)
+    throw new PasswordIsNotValidError(
+      "You must use a password different from the previous one"
+    );
+
+  const newHashedPassword = createHash(newPassword);
+  const result = await userRepository.updatePassword(email, newHashedPassword);
+
+  return result;
+};
+
+export const changeRoleUser = async (uid) => {
+  let result;
+  const user = await userRepository.getById(uid);
+  if (!user) throw new UserNotFoundError("User not found, incorrect id");
+  if (user.role === "user") {
+    result = await userRepository.changeRole(uid, "premium");
+  } else if (user.role === "premium") {
+    result = await userRepository.changeRole(uid, "user");
+  }
+
+  return result;
+};

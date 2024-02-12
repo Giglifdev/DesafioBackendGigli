@@ -1,33 +1,32 @@
-import ProductDto from "../DTOs/product.dto.js";
+import { Products as ProductsDao } from "../dao/factory.js";
 
 export default class ProductsRepository {
-  constructor(dao) {
-    this.dao = dao;
+  constructor() {
+    this.dao = new ProductsDao();
   }
 
-  getProducts = async () => {
-    const carts = await this.dao.getAll();
-    return carts;
-  };
-
-  addProduct = async (product) => {
-    const ProductToCreate = new ProductDto(product);
-    const result = await this.dao.save(ProductToCreate);
+  getAll = async (options) => {
+    const result = await this.dao.getAll(options);
     return result;
   };
 
-  getProductById = async (productId) => {
-    const cart = await this.dao.getById(productId);
-    return cart;
-  };
-
-  updateProduct = async (id, updatedFields) => {
-    const result = await this.dao.update(id, updatedFields);
+  getById = async (pid) => {
+    const result = await this.dao.getById(pid);
     return result;
   };
 
-  deleteProduct = async (productId) => {
-    const result = await this.dao.delete(productId);
+  create = async (product) => {
+    const result = await this.dao.create(product);
+    return result;
+  };
+
+  update = async (pid, product) => {
+    const result = await this.dao.update(pid, product);
+    return result;
+  };
+
+  delete = async (pid) => {
+    const result = await this.dao.delete(pid);
     return result;
   };
 }

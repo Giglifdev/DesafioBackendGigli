@@ -1,85 +1,72 @@
-import mongoose from "mongoose";
-import Carts from "../dao/memoryManager/carts.manager.js";
-import CartRepository from "../repositories/carts.repository.js";
+import Carts from "../dao/dbManagers/carts.manager.js";
+import Products from "../dao/dbManagers/products.manager.js";
+import { validateCart } from "../schemas/carts.schema.js";
+import CartsRepository from "../repositories/carts.repository.js";
+import ProductsRepository from "../repositories/products.repository.js";
+import { cartsFilePath } from "../utils.js";
+import { generateTicket } from "./tickets.services.js";
 
-const cartsDao = new Carts();
-const cartRepository = new CartRepository(cartsDao);
+const productsManager = new Products();
+const cartsManager = new Carts();
+const cartsRepository = new CartsRepository();
+const productsRepository = new ProductsRepository();
 
-const addCart = async (cart) => {
-  const result = cartRepository.addCart(cart);
-  return result;
-};
-
-const getCartById = async (cid) => {
-  const cart = await cartRepository
-    .getById(cid)
-    .populate("products.product")
-    .exec();
-  if (!cart) throw new Error("Cart not found.");
+export const getCart = async (cid) => {
+  const cart = await cartsRepository.getCartById(cid);
   return cart;
 };
 
-const addProduct = async (idCart, idProd) => {
-  const cart = await cartsManager.getById(idCart);
-
-  if (!cart) throw new Error("Cart not found.");
-  if ((await cartRepository.existProduct(idProd)) === false)
-    throw new Error("Product not found.");
-  if ((await cartRepository.isInStock(idProd)) === false)
-    throw new Error("Product whitout stock");
-
-  const productIndex = cart.products.findIndex(
-    (p) => p.product.toString() === idProd
-  );
-
-  if (productIndex === -1) {
-    cart.products.push({ product: idProd, quantity: 1 });
-  } else {
-    cart.products[productIndex].quantity++;
-  }
-
-  const updateCart = await cartRepository.updateCart(idCart, cart.products);
-  return updateCart;
+export const createCart = async () => {
+  const cart = await cartsRepository.create();
+  return cart;
 };
 
-const deleteProduct = async (idCart, idProd) => {
-  if ((await cartsManager.existCart(idCart)) === false)
-    throw new Error("Cart not found.");
-  const result = await cartRepository.deleteProduct(idCart, idProd);
+export const addProduct = async (cid, pid) => {
+  const cart = await cartsRepository.addProduct(cid, pid);
+  return cart;
+};
+
+export const updateCart = async (cid, products) => {
+  const updatedCart = await cartsRepository.updateCart(cid, products);
+  return updatedCart;
+};
+
+export const updateProducts = async (cid, pid, quantity) => {
+  const updatedQuantityCart = await cartsRepository.updateQuantityProduct(
+    cid,
+    pid,
+    quantity
+  );
+  return updatedQuantityCart;
+};
+
+export const deleteCartProducts = async (cid) => {
+  const result = await cartsRepository.deleteCartProducts(cid);
   return result;
 };
 
-const deleteAllProducts = async (idCart) => {
-  if ((await cartsManager.existCart(idCart)) === false)
-    throw new Error("Cart not found.");
-  const deleteProducts = await cartRepository.deleteAllProducts(idCart);
-  return deleteProducts;
+export const deleteProduct = async (cid, pid) => {
+  const result = await cartsRepository.deleteProductCart(cid, pid);
+  return result;
 };
 
-const updateAllProducts = async (idCart, newProducts) => {
-  if ((await cartsManager.existCart(idCart)) === false)
-    throw new Error("Cart not found.");
-  const updatedCart = await cartRepository.updateCart(idCart, {
-    products: newProducts,
+export const purchaseProducts = async (cid, user) => {
+  const cart = await cartsRepository.getCartById(cid);
+  const outStock = [];
+  let amount = 0;
+  cart.products.forEach(async ({ product, quantity }) => {
+    if (product.stock >= quantity) {
+      amount += product.price * quantity;
+      product.stock -= quantity;
+
+      await productsRepository.update(product._id, product);
+    } else {
+      outStock.push({ product, quantity });
+    }
   });
-  return updatedCart;
-};
 
-const updateQuantity = async (idCart, idProduct, newQuantity) => {
-  const updatedCart = await cartRepository.updateProductQuantity(
-    idCart,
-    idProduct,
-    newQuantity
-  );
-  return updatedCart;
-};
+  const ticket = await generateTicket(user, amount);
+  const cartUpdated = await cartsRepository.updateCart(cid, outStock);
 
-export {
-  addCart,
-  getCartById,
-  addProduct,
-  deleteProduct,
-  deleteAllProducts,
-  updateAllProducts,
-  updateQuantity,
+  return { ticket, cartUpdated };
 };

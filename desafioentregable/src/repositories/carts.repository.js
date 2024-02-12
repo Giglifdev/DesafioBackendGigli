@@ -1,38 +1,42 @@
-import CartDto from "../DTOs/cart.dto.js";
+import { Carts as CartsDao } from "../dao/factory.js";
 
-export default class CartRepository {
-  constructor(dao) {
-    this.dao = dao;
+export default class CartsRepository {
+  constructor() {
+    this.dao = new CartsDao();
   }
 
-  getAll = async () => {
-    const result = await this.dao.getAll();
+  getCartById = async (cid) => {
+    const result = await this.dao.getById(cid);
     return result;
   };
 
-  addCart = async (cart) => {
-    const cartToCreate = new CartDto(cart);
-    const result = await this.dao.create(cartToCreate);
+  create = async () => {
+    const result = await this.dao.create();
     return result;
   };
 
-  getById = async (cartId) => {
-    const cart = await this.dao.getById(cartId);
-    return cart;
-  };
-
-  updateCart = async (cartId, products) => {
-    const result = await this.dao.update(cartId, products);
+  addProduct = async (cid, pid) => {
+    const result = await this.dao.addProduct(cid, pid);
     return result;
   };
 
-  updateProductQuantity = async (cartId, productId, newQuantity) => {
-    const result = await this.dao.update(cartId, productId, newQuantity);
+  updateCart = async (cid, products) => {
+    const result = await this.dao.updateCart(cid, products);
     return result;
   };
 
-  deleteCart = async (cartId) => {
-    const result = this.dao.delete(cartId);
+  updateQuantityProduct = async (cid, pid, quantity) => {
+    const result = await this.dao.updateQuantityProduct(cid, pid, quantity);
+    return result;
+  };
+
+  deleteCartProducts = async (cid) => {
+    const result = await this.dao.deleteProducts(cid);
+    return result;
+  };
+
+  deleteProductCart = async (cid, pid) => {
+    const result = await this.dao.deleteProductCart(cid, pid);
     return result;
   };
 }

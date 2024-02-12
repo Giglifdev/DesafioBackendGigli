@@ -1,56 +1,194 @@
+import { generateToken, createHash, isValidPassowrd } from "../utils.js";
+import { validateUser } from "../schemas/users.schema.js";
+import { login as loginServices } from "../services/sessions.services.js";
+import { showPublicUser as showPublicUserServices } from "../services/sessions.services.js";
+import { addCartToUser as addCartToUserServices } from "../services/sessions.services.js";
+import { logout as logoutServices } from "../services/sessions.services.js";
+import { register as registerServices } from "../services/sessions.services.js";
+import { passwordLink as passwordLinkServices } from "../services/sessions.services.js";
+import { updatePassword as updatePasswordServices } from "../services/sessions.services.js";
+import { changeRoleUser as changeRoleUserServices } from "../services/sessions.services.js";
+import { createCart as createCartServices } from "../services/carts.services.js";
 import {
-  Register as RegisterService,
-  Login as LoginService,
-} from "../services/sessions.services.js";
+  PasswordIsNotValidError,
+  UserNotFoundError,
+} from "../utils/custom.exceptions.js";
 
-const Login = async (req, res) => {
+export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const accessToken = await LoginService(email, password);
-    res
-      .cookie("coderCookieToken", accessToken, {
-        maxAge: 60 * 60 * 1000,
+    if (!email || !password) return res.sendClientError("incomplete values");
+
+    if (email === "adminCoder@coder.com" && password === "adminCod3r123") {
+      const userAdminCoder = {
+        _id: 1,
+        first_name: "Admin",
+        last_name: "Coder",
+        email,
+        role: "admin",
+      };
+      const accessToken = generateToken(userAdminCoder);
+
+      res.cookie("coderCookieToken", accessToken, {
+        maxAge: 24 * 60 * 60 * 1000,
         httpOnly: true,
-      })
-      .send({ status: "success", message: "login success" });
+      });
+      return res.sendSuccess(accessToken);
+    }
+    let user = await loginServices(email);
+    if (!user) return res.sendAuthError("incorrect credentials");
+
+    const comparePassword = isValidPassowrd(password, user.password);
+
+    if (!comparePassword) return res.sendAuthError("incorrect credentials");
+
+    let cartId;
+
+    if (!user.cart) {
+      cartId = await createCartServices();
+      user = await addCartToUserServices(user, cartId);
+    }
+
+    const publicUser = await showPublicUserServices(user);
+
+    const accessToken = generateToken(publicUser);
+
+    res.cookie("coderCookieToken", accessToken, {
+      maxAge: 24 * 60 * 60 * 1000,
+      httpOnly: true,
+    });
+    return res.sendSuccess(accessToken);
   } catch (error) {
-    res.status(500).send({ error: error.message });
+    req.logger.error(`${error.message}`);
+    return res.sendServerError(error.message);
   }
 };
 
-const Logout = (req, res) => {
-  req.session.destroy((error) => {
-    if (error)
-      return res.status(500).send({ status: "error", message: error.message });
-    res.redirect("/login");
-  });
-};
-
-const Register = async (req, res) => {
+export const register = async (req, res) => {
   try {
-    const { first_name, last_name, age, role, email, password } = req.body;
-    const userToSave = await RegisterService(
-      first_name,
-      last_name,
-      age,
-      role,
-      email,
-      password
-    );
-
-    res.status(201).send({ status: "success", payload: userToSave });
+    const resultUser = validateUser(req.body);
+    if (resultUser.error) {
+      req.logger.error(resultUser.error);
+      return res.sendUnproccesableEntity(resultUser.error);
+    }
+    const user = resultUser.data;
+    const existsUser = await loginServices(user.email);
+    if (existsUser) {
+      req.logger.error("user already exists");
+      return res.sendClientError("user already exists");
+    }
+    const registeredUser = await registerServices(user);
+    return res.sendSuccessNewResource(registeredUser);
   } catch (error) {
-    res.status(500).send({ error: error.message });
+    req.logger.fatal(error.message);
+    return res.sendServerError(error.message);
   }
 };
 
-const Github = async (req, res) => {
-  res.send({ status: "success", message: "user registered" });
+export const logout = async (req, res) => {
+  try {
+    const result = await logoutServices(req.user.email);
+    return res.clearCookie("coderCookieToken").redirect("/login");
+  } catch (error) {
+    req.logger.error(`${error.message}`);
+  }
 };
 
-const Github_callback = async (req, res) => {
-  req.session.user = req.user;
-  res.redirect("/");
+export const github = async (req, res) => {
+  return res.send({ status: "success", message: "user registered" });
 };
 
-export { Login, Logout, Register, Github, Github_callback };
+export const githubCallback = async (req, res) => {
+  req.user = {
+    first_name: req.user.first_name,
+    last_name: req.user.last_name,
+    email: req.user.email,
+    age: req.user.age,
+    role: req.user.role,
+  };
+  return res.redirect("/products");
+};
+
+export const getCartByUser = async (req, res) => {
+  try {
+    const { cart: userCart } = req.user;
+    const { _id: cid } = userCart;
+
+    if (cid) return res.send({ status: "success", payload: { _id: cid } });
+  } catch (error) {
+    req.logger.error(`${error.message}`);
+    return res.sendServerError(error.message);
+  }
+};
+
+export const passwordLink = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await loginServices(email);
+    if (user) {
+      const newUser = {
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email,
+      };
+      const token = generateToken(newUser, "1h");
+      const result = await passwordLinkServices(newUser, token);
+      if (!result.messageId) {
+        req.logger.error("Error al enviar email");
+        return res.redirect("/login");
+      }
+
+      return res.sendSuccess("Email was sent successfully");
+    }
+  } catch (error) {
+    req.logger.error(`${error.message}`);
+    return res.sendServerError(error.message);
+  }
+};
+
+export const passwordChange = async (req, res) => {
+  try {
+    const data = req.body;
+    const { password, email } = data;
+
+    const user = await loginServices(email);
+    if (!user) {
+      req.logger.error(`User with email ${user.email} doesn't exists`);
+      return res.sendUnproccesableEntity(
+        `User with email ${user.email} doesn't exists`
+      );
+    }
+
+    const newUser = await updatePasswordServices(email, user, password);
+    if (!newUser) {
+      req.logger.error(`User with email ${user.email} doesn't exists`);
+      return res.sendUnproccesableEntity(`Password cannot be changed`);
+    }
+
+    return res.sendSuccess("Password has been changed successfully");
+  } catch (error) {
+    console.log(error);
+    if (error instanceof PasswordIsNotValidError) {
+      return res.sendUnproccesableEntity(error.message);
+    }
+    req.logger.fatal(`${error.message}`);
+    return res.sendServerError(error.message);
+  }
+};
+
+export const changeRoleUser = async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const result = await changeRoleUserServices(uid);
+
+    return res.sendSuccess(result);
+  } catch (error) {
+    if (error instanceof UserNotFoundError) {
+      req.logger.error(`${error.message}`);
+      return res.sendClientError(error.message);
+    } else {
+      req.logger.fatal(`${error.message}`);
+      return res.sendServerError(error.message);
+    }
+  }
+};
